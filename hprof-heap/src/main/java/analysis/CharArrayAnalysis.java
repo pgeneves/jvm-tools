@@ -9,7 +9,6 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.*;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static java.util.stream.Collectors.counting;
@@ -103,40 +102,22 @@ public class CharArrayAnalysis {
 
         System.out.println("Found " + roots.size() + " component tree roots and " + total + " nodes in total");
 
-        roots.stream().map(r -> limit(valueToString(HeapWalker.primitiveArrayValue(r))))
+        roots.stream()
+                .filter(r -> r.getSize() > 1024)
+                .map(r -> limit(valueToString(HeapWalker.primitiveArrayValue(r))))
                 .filter(s -> s.startsWith("<response "))
-                .limit(250).forEach(entry -> {
+                .limit(100).forEach(entry -> {
                     System.out.println(entry);
                 });
 
-        Map<String, Long> count = roots.stream().map(r -> limit(valueToString(HeapWalker.primitiveArrayValue(r))))
-                .collect(Collectors.groupingBy(s -> limit(s, 10), counting()));
+        Map<String, Long> count = roots.stream()
+                .filter(r -> r.getSize() > 1024)
+                .map(r -> instanceEntry.from(valueToString(HeapWalker.primitiveArrayValue(r)), r.getSize()))
+                .collect(Collectors.groupingBy(v -> v.getKey(), Collectors.summingLong(instanceEntry::getSize)));
 
         count.entrySet().stream().filter(entry -> entry.getValue() > 100).forEach(entry -> {
-            System.out.println(entry.getValue()+" => "+entry.getKey());
+            System.out.println("SIZE "+ entry.getValue()+" FOR "+entry.getKey());
         });
-
-//        for (Instance root: roots) {
-//            System.out.println(limit(valueToString(HeapWalker.primitiveArrayValue(maxInst))));
-//        }
-
-        
-//        // Report tree for each root UIComponent found before
-//        for(Instance root: roots) {
-//            HeapHistogram hh = new HeapHistogram();
-//            // links variable contains all edges in component graphs identified during heap scan
-//            collect(hh, root, links);
-//            System.out.println();
-//            System.out.println(root.getInstanceId());
-//            System.out.println(hh.formatTop(10));
-//            System.out.println();
-//            // Dump may contain partial trees
-//            // Report only reasonably large object clusters
-//            if (hh.getTotalCount() > 500) {
-//                printTree(root, links);
-//                break;
-//            }
-//        }
     }
 
     private static String limit(String val, int len) {
@@ -211,4 +192,32 @@ public class CharArrayAnalysis {
             return false;
         }
     }    
+
+    static class instanceEntry {
+        private final String key;
+        private final String val;
+        private final long size;
+
+        static instanceEntry from(String val, long size) {
+            return new instanceEntry(limit(val, 10), limit(val, 64), size);
+        }
+
+        instanceEntry(String key, String val, long size) {
+            this.key = key;
+            this.val = val;
+            this.size = size;
+        }
+
+        public String getKey() {
+            return key;
+        }
+
+        public String getVal() {
+            return val;
+        }
+
+        public long getSize() {
+            return size;
+        }
+    }
 }
