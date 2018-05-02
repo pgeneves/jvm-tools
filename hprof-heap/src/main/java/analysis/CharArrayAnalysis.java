@@ -26,7 +26,7 @@ public class CharArrayAnalysis {
         char[] tst = new char[5];
         System.out.println(tst.getClass());
         if (args.length != 1 || args[0].isEmpty()) {
-            System.err.println("Please provide heapdump path as sole argument");
+            System.out.println("Usage: java -jar hprof-heap-0.9.4-SNAPSHOT-spring-boot.jar HEADUMP_FILE");
             System.exit(1);
         }
         String dumppath = args[0];
@@ -52,7 +52,6 @@ public class CharArrayAnalysis {
 
         // Collect all subclasses of javax.faces.component.UIComponent 
         for(JavaClass jc: heap.getAllClasses()) {
-            System.out.println("class => "+jc.getName());
            if (isComponent(jc)) {
                compClasses.add(jc);
            }
@@ -104,8 +103,14 @@ public class CharArrayAnalysis {
 
         System.out.println("Found " + roots.size() + " component tree roots and " + total + " nodes in total");
 
+        roots.stream().map(r -> limit(valueToString(HeapWalker.primitiveArrayValue(r))))
+                .filter(s -> s.startsWith("<response "))
+                .limit(250).forEach(entry -> {
+                    System.out.println(entry);
+                });
+
         Map<String, Long> count = roots.stream().map(r -> limit(valueToString(HeapWalker.primitiveArrayValue(r))))
-                .collect(Collectors.groupingBy(Function.identity(), counting()));
+                .collect(Collectors.groupingBy(s -> limit(s, 10), counting()));
 
         count.entrySet().stream().filter(entry -> entry.getValue() > 100).forEach(entry -> {
             System.out.println(entry.getValue()+" => "+entry.getKey());
@@ -134,8 +139,12 @@ public class CharArrayAnalysis {
 //        }
     }
 
+    private static String limit(String val, int len) {
+        return val.substring(0, Math.min(val.length(), len));
+    }
+
     private static String limit(String val) {
-        return val.substring(0, Math.min(val.length(), 64));
+        return limit(val, 64);
     }
 
     private static String valueToString(Object value) {
